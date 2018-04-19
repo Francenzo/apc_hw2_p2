@@ -9,6 +9,9 @@
 #include "common.h"
 
 double size;
+// Amount of bins in one row
+int bin_row_count;
+int max_per_bin;
 
 //
 //  tuned constants
@@ -37,6 +40,18 @@ double read_timer( )
 void set_size( int n )
 {
     size = sqrt( density * n );
+    bin_row_count = (size/cutoff);
+    // max_per_bin = n/(bin_row_count*bin_row_count);
+    max_per_bin = 5;
+    printf("size = %f, num_bins = %i, max_per_bin = %i, n = %i, size = %f\r\n", size, bin_row_count*bin_row_count, max_per_bin, n, size);
+}
+
+//
+// get bin row size
+//
+int get_bin_row_size()
+{
+    return bin_row_count;
 }
 
 //
@@ -73,6 +88,45 @@ void init_particles( int n, particle_t *p )
         //
         p[i].vx = drand48()*2-1;
         p[i].vy = drand48()*2-1;
+    }
+    free( shuffle );
+}
+
+//
+//  Initialize the particle positions and velocities
+// Make a structure of arrays for memory coalescence
+//
+void init_particles_array( int n, particle_arr_t &p )
+{
+    srand48( time( NULL ) );
+        
+    int sx = (int)ceil(sqrt((double)n));
+    int sy = (n+sx-1)/sx;
+    
+    int *shuffle = (int*)malloc( n * sizeof(int) );
+    for( int i = 0; i < n; i++ )
+        shuffle[i] = i;
+    
+    for( int i = 0; i < n; i++ ) 
+    {
+        //
+        //  make sure particles are not spatially sorted
+        //
+        int j = lrand48()%(n-i);
+        int k = shuffle[j];
+        shuffle[j] = shuffle[n-i-1];
+        
+        //
+        //  distribute particles evenly to ensure proper spacing
+        //
+        p.x[i] = size*(1.+(k%sx))/(1+sx);
+        p.y[i] = size*(1.+(k/sx))/(1+sy);
+
+        //
+        //  assign random velocities within a bound
+        //
+        p.vx[i] = drand48()*2-1;
+        p.vy[i] = drand48()*2-1;
     }
     free( shuffle );
 }
