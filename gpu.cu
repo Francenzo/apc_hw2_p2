@@ -13,19 +13,14 @@ extern double size;
 //  benchmarking program
 //
 
-// __global__ void clear_bins_gpu(particle_t * bin_arr, int bin_count)
-// {
-//   // Get thread (bin) ID
-//   int tid = threadIdx.x + blockIdx.x * blockDim.x;
-//   int bin_id = tid * MAX_BIN_SIZE;
-//   if(bin_id >= bin_count) return;
+__global__ void clear_bins_gpu(bin_t * bin_arr, int bin_count)
+{
+  // Get thread (bin) ID
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if(tid >= bin_count) return;
 
-//   for(int j = 0 ; j < MAX_BIN_SIZE ; j++)
-//   {
-//     memset(bin_arr[bin_id+j];
-//     p = NULL;
-//   }
-// }
+  bin_arr[tid].size = 0;
+}
 
 __device__ void compute_bin_gpu(particle_t &particle, int size, int bin_row_size)
 {
@@ -39,20 +34,19 @@ __device__ void compute_bin_gpu(particle_t &particle, int size, int bin_row_size
 
 __global__ void set_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int size, int bin_row_size)
 {
-  bin_arr[10].arr[0] = 10;
-  bin_arr[10].size = 1;
-  // // Get thread (particle) ID
-  // int tid = threadIdx.x + blockIdx.x * blockDim.x;
-  // if(tid >= n) return;
+  // bin_arr[10].size = 4;
+  // Get thread (particle) ID
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if(tid >= n) return;
 
 
-  // compute_bin_gpu(particles[tid], size, bin_row_size);
+  compute_bin_gpu(particles[tid], size, bin_row_size);
 
-  // bin_t * bin = &bin_arr[particles[tid].binNum];
+  bin_t * bin = &bin_arr[particles[tid].binNum];
   // if (bin->size < 4)
   // {
-  //   bin->arr[(bin_arr->size)+1] = particles[tid].binNum;
-  //   bin->size = 1;
+    bin->arr[(bin_arr->size)+1] = particles[tid].binNum;
+    (bin->size)++;
   // }
   // else
   // {
@@ -78,6 +72,36 @@ __device__ void apply_force_gpu(particle_t &particle, particle_t &neighbor)
   particle.ax += coef * dx;
   particle.ay += coef * dy;
 
+}
+
+__global__ void compute_forces_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int bin_row_size)
+{
+  // Get thread (particle) ID
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if(tid >= n) return;
+
+  particles[tid].ax = particles[tid].ay = 0;
+  int binNum = particles[tid].binNum;
+
+  // All surrounding bins in a 3x3 square
+  int binsToCheck[] = {   binNum - bin_row_size - 1,
+                          binNum - bin_row_size,
+                          binNum - bin_row_size + 1,
+                          binNum - 1,
+                          binNum,
+                          binNum + 1,
+                          binNum + bin_row_size - 1,
+                          binNum + bin_row_size,
+                          binNum + bin_row_size + 1
+                      };
+
+
+  for(int j = 0 ; j < 9; j++)
+  {
+    int tmpNum = binsToCheck[j];
+    for (int iCount = 0; iCount < bin_arr[tmpNum].size; iCount++)
+      apply_force_gpu(particles[tid], particles[bin_arr[tmpNum].arr[iCount]]);
+  }
 }
 
 __global__ void compute_forces_gpu(particle_t * particles, int n)
@@ -159,9 +183,9 @@ int main( int argc, char **argv )
   bin_row_size = get_bin_row_size();
   int num_bins = bin_row_size * bin_row_size;
   // Particle bins
-  bin_t * bin_arr = (bin_t*) malloc( n * sizeof(bin_t) * MAX_BIN_SIZE );
+  bin_t * bin_arr = (bin_t*) malloc( num_bins * sizeof(bin_t) );
   bin_t * d_bins;
-  cudaMalloc((void **) &d_bins, n * sizeof(bin_t) * MAX_BIN_SIZE);
+  cudaMalloc((void **) &d_bins, num_bins * sizeof(bin_t));
   // std::vector< std::vector<particle_t *> > vec_bins(num_bins);
 
   init_particles( n, particles );
@@ -169,8 +193,15 @@ int main( int argc, char **argv )
   cudaThreadSynchronize();
   double copy_time = read_timer( );
 
+// #define GPU_BINS
+#ifdef GPU_BINS
   // Copy the particles to the GPU
   cudaMemcpy(d_particles, particles, n * sizeof(particle_t), cudaMemcpyHostToDevice);
+
+  memset(bin_arr, 0x0, num_bins*sizeof(bin_t) );
+  cudaMemset(d_bins, 0, num_bins*sizeof(bin_t) );
+  cudaMemcpy(d_bins, bin_arr, num_bins * sizeof(bin_t), cudaMemcpyHostToDevice);
+#endif
 
   cudaThreadSynchronize();
   copy_time = read_timer( ) - copy_time;
@@ -181,12 +212,16 @@ int main( int argc, char **argv )
   cudaThreadSynchronize();
   double simulation_time = read_timer( );
 
+#ifdef GPU_BINS
+  printf("Using bins...\r\n");
+#endif
+
+
   for( int step = 0; step < NSTEPS; step++ )
   {
     int grid = (n + NUM_THREADS - 1) / NUM_THREADS;
 
-#define GPU_BINS
-// #ifdef GPU_BINS
+#ifdef GPU_BINS
     //
     // Put particles into bins
     //
@@ -195,14 +230,18 @@ int main( int argc, char **argv )
     //
     //  compute bins
     //
-    // compute_bin_forces_gpu <<< grid, NUM_THREADS >>> (d_bins, n);
-// #else
+    compute_forces_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, bin_row_size);
+#else
 
     //
     //  compute forces
     //
 	  compute_forces_gpu <<< grid, NUM_THREADS >>> (d_particles, n);
-// #endif
+
+
+    // cudaMemcpy(particles, d_particles, n * sizeof(particle_t), cudaMemcpyDeviceToHost);
+    // printf("particle[%i] = %f\r\n", 1, particles[1].y);
+#endif
         
     //
     //  move particles
@@ -211,22 +250,16 @@ int main( int argc, char **argv )
 
 #ifdef GPU_BINS
     // Set bin array to null
-    cudaMemcpy(bin_arr, d_bins, n * sizeof(bin_t), cudaMemcpyDeviceToHost);
-    for (int iCount = 0; iCount < bin_row_size * bin_row_size; iCount++)
-    {
-      // for (int jCount = 0; jCount < 4; jCount++)
-      // {
-        if (bin_arr[iCount].size > 0)
-        {
-          printf("bin[%i] size = %i\r\n", iCount, bin_arr[iCount].size);
-        }
-      // }
-    }
+    // cudaMemcpy(bin_arr, d_bins, n * sizeof(bin_t), cudaMemcpyDeviceToHost);
+    // for (int iCount = 0; iCount < bin_row_size * bin_row_size; iCount++)
+    // {
+    //   if (bin_arr[iCount].size > 0)
+    //   {
+    //     printf("bin[%i] size = %i\r\n", iCount, bin_arr[iCount].size);
+    //   }
+    // }
 
-    cudaMemset(d_bins, 0, num_bins*sizeof(int));
-
-    cudaMemcpy(particles, d_particles, n * sizeof(particle_t), cudaMemcpyDeviceToHost);
-    printf("particle[%i] = %f\r\n", 1, particles[100].y);
+    // cudaMemset(d_bins, 0, num_bins*sizeof(bin_t));
 
 #endif
         
