@@ -22,7 +22,7 @@ __global__ void clear_bins_gpu(bin_t * bin_arr, int bin_count)
   bin_arr[tid].size = 0;
 }
 
-__device__ void compute_bin_gpu(particle_t &particle, int size, int bin_row_size)
+__device__ void bin_num_gpu(particle_t &particle, int size, int bin_row_size)
 {
   double frac_x = particle.x/size;
   double frac_y = particle.y/size;
@@ -32,21 +32,33 @@ __device__ void compute_bin_gpu(particle_t &particle, int size, int bin_row_size
   particle.binNum = binNum;
 }
 
-__global__ void set_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int size, int bin_row_size)
+__global__ void compute_bins_gpu(particle_t * particles, int n, int size, int bin_row_size)
 {
-  // bin_arr[10].size = 4;
   // Get thread (particle) ID
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   if(tid >= n) return;
 
+  for(int j = 0 ; j < n ; j++)
+    bin_num_gpu(particles[tid], size, bin_row_size);
+}
 
-  compute_bin_gpu(particles[tid], size, bin_row_size);
+__global__ void set_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int size, int bin_row_size)
+{
+  // Get thread (particle) ID
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if(tid >= 1)
+    return;
 
-  bin_t * bin = &bin_arr[particles[tid].binNum];
-  // if (bin->size < 4)
+  // compute_bin_gpu(particles[tid], size, bin_row_size);
+
+  // for(int j = 0 ; j < n ; j++)
+  // bin_arr[0].size += 1;
+
+  // bin_t * bin = &bin_arr[particles[tid].binNum];
+  // if (bin->size < MAX_BIN_SIZE)
   // {
-    bin->arr[(bin_arr->size)+1] = particles[tid].binNum;
-    (bin->size)++;
+  //   bin->arr[(bin_arr->size)] = tid;
+  //   (bin->size)++;
   // }
   // else
   // {
@@ -96,12 +108,26 @@ __global__ void compute_forces_bin_gpu(particle_t * particles, bin_t * bin_arr, 
                       };
 
 
-  for(int j = 0 ; j < 9; j++)
+  // for(int j = 0 ; j < 9; j++)
+  // {
+  //   int tmpNum = binsToCheck[j];
+  //   if (tmpNum >= 0 && tmpNum < bin_row_size * bin_row_size)
+  //   {
+  //     for (int iCount = 0; iCount < bin_arr[tmpNum].size; iCount++)
+  //       apply_force_gpu(particles[tid], particles[bin_arr[tmpNum].arr[iCount]]);
+  //   }
+  // }
+
+  for(int j = 0 ; j < bin_row_size * bin_row_size; j++)
   {
-    int tmpNum = binsToCheck[j];
-    for (int iCount = 0; iCount < bin_arr[tmpNum].size; iCount++)
-      apply_force_gpu(particles[tid], particles[bin_arr[tmpNum].arr[iCount]]);
+  
+      for (int iCount = 0; iCount < bin_arr[j].size; iCount++)
+        apply_force_gpu(particles[tid], particles[bin_arr[j].arr[iCount]]);
+    
   }
+
+  // for (int iCount = 0; iCount < n; iCount++)
+  //   apply_force_gpu(particles[tid], particles[iCount]);
 }
 
 __global__ void compute_forces_gpu(particle_t * particles, int n)
@@ -193,11 +219,12 @@ int main( int argc, char **argv )
   cudaThreadSynchronize();
   double copy_time = read_timer( );
 
-// #define GPU_BINS
-#ifdef GPU_BINS
   // Copy the particles to the GPU
   cudaMemcpy(d_particles, particles, n * sizeof(particle_t), cudaMemcpyHostToDevice);
 
+
+// #define GPU_BINS
+#ifdef GPU_BINS
   memset(bin_arr, 0x0, num_bins*sizeof(bin_t) );
   cudaMemset(d_bins, 0, num_bins*sizeof(bin_t) );
   cudaMemcpy(d_bins, bin_arr, num_bins * sizeof(bin_t), cudaMemcpyHostToDevice);
@@ -225,6 +252,11 @@ int main( int argc, char **argv )
     //
     // Put particles into bins
     //
+    compute_bins_gpu <<< grid, NUM_THREADS >>> (d_particles, n, size, bin_row_size);
+
+    //
+    // Put particles into bins
+    //
     set_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, size, bin_row_size);
 
     //
@@ -249,17 +281,42 @@ int main( int argc, char **argv )
 	  move_gpu <<< grid, NUM_THREADS >>> (d_particles, n, size);
 
 #ifdef GPU_BINS
-    // Set bin array to null
-    // cudaMemcpy(bin_arr, d_bins, n * sizeof(bin_t), cudaMemcpyDeviceToHost);
-    // for (int iCount = 0; iCount < bin_row_size * bin_row_size; iCount++)
+    // Check if all are there
+    cudaMemcpy(bin_arr, d_bins, n * sizeof(bin_t), cudaMemcpyDeviceToHost);
+    // for (int jCount =0; jCount < n; jCount++)
     // {
-    //   if (bin_arr[iCount].size > 0)
+    //   bool isFound = false;
+    //   for (int iCount = 0; iCount < bin_row_size * bin_row_size; iCount++)
     //   {
-    //     printf("bin[%i] size = %i\r\n", iCount, bin_arr[iCount].size);
+    //     for (int lCount = 0; lCount < bin_arr[iCount].size; lCount++)
+    //     {
+    //       if (bin_arr[iCount].arr[lCount] == jCount)
+    //       {
+    //         isFound = true;
+    //         break;
+    //       }
+    //     }
+    //     if (isFound)
+    //     {
+    //       break;
+    //     }
+    //   }
+    //   if (!isFound)
+    //   {
+    //     printf("particle %i not found in bin\r\n", jCount);
     //   }
     // }
 
-    // cudaMemset(d_bins, 0, num_bins*sizeof(bin_t));
+    int binTotes = 0;
+    for (int iCount = 0; iCount < bin_row_size * bin_row_size; iCount++)
+    {
+      binTotes += bin_arr[iCount].size;
+    }
+    printf("Totes size = %i, bin[0].size = %i\r\n", binTotes, bin_arr[0].size);
+
+    exit(0);
+    // Set bin array to null
+    cudaMemset(d_bins, 0, num_bins*sizeof(bin_t));
 
 #endif
         

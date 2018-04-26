@@ -41,9 +41,7 @@ void set_size( int n )
 {
     size = sqrt( density * n );
     bin_row_count = (size/cutoff);
-    // max_per_bin = n/(bin_row_count*bin_row_count);
-    max_per_bin = 5;
-    printf("size = %f, num_bins = %i, max_per_bin = %i, n = %i, size = %f\r\n", size, bin_row_count*bin_row_count, max_per_bin, n, size);
+    printf("size = %f, num_bins = %i, max_per_bin = %i, n = %i, size = %f\r\n", size, bin_row_count*bin_row_count, MAX_BIN_SIZE, n, size);
 }
 
 //

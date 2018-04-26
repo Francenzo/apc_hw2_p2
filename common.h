@@ -10,7 +10,7 @@ inline int mymax( int a, int b ) { return a > b ? a : b; }
 #define min_r   (cutoff/100)
 #define dt      0.0005
 
-#define MAX_BIN_SIZE 5 // Should be 4 but tbh I'm not 100% sure so... 5
+#define MAX_BIN_SIZE 4 // Should be 4 but tbh I'm not 100% sure so... 5
 
 
 //
@@ -52,7 +52,7 @@ typedef struct
 typedef struct 
 {
   int size;
-  int arr[4];
+  int arr[MAX_BIN_SIZE];
 } bin_t;
 
 //
