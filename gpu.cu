@@ -37,9 +37,7 @@ __global__ void compute_bins_gpu(particle_t * particles, int n, int size, int bi
   // Get thread (particle) ID
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   if(tid >= n) return;
-
-  for(int j = 0 ; j < n ; j++)
-    bin_num_gpu(particles[tid], size, bin_row_size);
+  bin_num_gpu(particles[tid], size, bin_row_size);
 }
 
 __global__ void set_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int size, int bin_row_size)
@@ -108,23 +106,23 @@ __global__ void compute_forces_bin_gpu(particle_t * particles, bin_t * bin_arr, 
                       };
 
 
-  // for(int j = 0 ; j < 9; j++)
-  // {
-  //   int tmpNum = binsToCheck[j];
-  //   if (tmpNum >= 0 && tmpNum < bin_row_size * bin_row_size)
-  //   {
-  //     for (int iCount = 0; iCount < bin_arr[tmpNum].size; iCount++)
-  //       apply_force_gpu(particles[tid], particles[bin_arr[tmpNum].arr[iCount]]);
-  //   }
-  // }
-
-  for(int j = 0 ; j < bin_row_size * bin_row_size; j++)
+  for(int j = 0 ; j < 9; j++)
   {
-  
-      for (int iCount = 0; iCount < bin_arr[j].size; iCount++)
-        apply_force_gpu(particles[tid], particles[bin_arr[j].arr[iCount]]);
-    
+    int tmpNum = binsToCheck[j];
+    if (tmpNum >= 0 && tmpNum < bin_row_size * bin_row_size)
+    {
+      for (int iCount = 0; iCount < bin_arr[tmpNum].size; iCount++)
+        apply_force_gpu(particles[tid], particles[bin_arr[tmpNum].arr[iCount]]);
+    }
   }
+
+  // for(int j = 0 ; j < bin_row_size * bin_row_size; j++)
+  // {
+  
+  //     for (int iCount = 0; iCount < bin_arr[j].size; iCount++)
+  //       apply_force_gpu(particles[tid], particles[bin_arr[j].arr[iCount]]);
+    
+  // }
 
   // for (int iCount = 0; iCount < n; iCount++)
   //   apply_force_gpu(particles[tid], particles[iCount]);
@@ -247,6 +245,7 @@ int main( int argc, char **argv )
   for( int step = 0; step < NSTEPS; step++ )
   {
     int grid = (n + NUM_THREADS - 1) / NUM_THREADS;
+    // int grid_bins = (num_bins + NUM_THREADS - 1) / NUM_THREADS;
 
 #ifdef GPU_BINS
     //
@@ -307,14 +306,15 @@ int main( int argc, char **argv )
     //   }
     // }
 
-    int binTotes = 0;
-    for (int iCount = 0; iCount < bin_row_size * bin_row_size; iCount++)
-    {
-      binTotes += bin_arr[iCount].size;
-    }
-    printf("Totes size = %i, bin[0].size = %i\r\n", binTotes, bin_arr[0].size);
+    // int binTotes = 0;
+    // for (int iCount = 0; iCount < bin_row_size * bin_row_size; iCount++)
+    // {
+    //   binTotes += bin_arr[iCount].size;
+    // }
+    // printf("Totes size = %i, bin[0].size = %i\r\n", binTotes, bin_arr[0].size);
 
-    exit(0);
+    // exit(0);
+    
     // Set bin array to null
     cudaMemset(d_bins, 0, num_bins*sizeof(bin_t));
 
