@@ -7,6 +7,7 @@
 #include "common.h"
 
 #define NUM_THREADS 256
+#define TILE_SIZE 32
 
 extern double size;
 //
@@ -44,24 +45,23 @@ __global__ void set_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int 
 {
   // Get thread (particle) ID
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
-  if(tid >= 1)
+  // int thread_id = threadIdx.x;
+  // int block_id = blockIdx.x;
+  if(tid >= bin_row_size)
     return;
 
-  // compute_bin_gpu(particles[tid], size, bin_row_size);
+  // _shared_ bin_t tmp_bin_arr[64];
 
-  // for(int j = 0 ; j < n ; j++)
-  // bin_arr[0].size += 1;
+  for (int iCount = 0; iCount < n; iCount++)
+  {
+    int binNum = particles[iCount].binNum;
+    if (binNum > (tid - 1) * bin_row_size && binNum > tid * bin_row_size)
+    {
+      bin_arr[binNum].arr[bin_arr[binNum].size] = iCount;
+      atomicAdd(&(bin_arr[binNum].size), 1);
+    }
+  }
 
-  // bin_t * bin = &bin_arr[particles[tid].binNum];
-  // if (bin->size < MAX_BIN_SIZE)
-  // {
-  //   bin->arr[(bin_arr->size)] = tid;
-  //   (bin->size)++;
-  // }
-  // else
-  // {
-  //   printf("Error: Over max bin size!\r\n");
-  // }
 }
 
 __device__ void apply_force_gpu(particle_t &particle, particle_t &neighbor)
@@ -221,7 +221,7 @@ int main( int argc, char **argv )
   cudaMemcpy(d_particles, particles, n * sizeof(particle_t), cudaMemcpyHostToDevice);
 
 
-// #define GPU_BINS
+#define GPU_BINS
 #ifdef GPU_BINS
   memset(bin_arr, 0x0, num_bins*sizeof(bin_t) );
   cudaMemset(d_bins, 0, num_bins*sizeof(bin_t) );
@@ -256,7 +256,7 @@ int main( int argc, char **argv )
     //
     // Put particles into bins
     //
-    set_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, size, bin_row_size);
+    // set_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, size, bin_row_size);
 
     //
     //  compute bins
@@ -281,7 +281,7 @@ int main( int argc, char **argv )
 
 #ifdef GPU_BINS
     // Check if all are there
-    cudaMemcpy(bin_arr, d_bins, n * sizeof(bin_t), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(bin_arr, d_bins, n * sizeof(bin_t), cudaMemcpyDeviceToHost);
     // for (int jCount =0; jCount < n; jCount++)
     // {
     //   bool isFound = false;
