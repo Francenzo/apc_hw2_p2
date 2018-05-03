@@ -8,6 +8,7 @@
 
 #define NUM_THREADS 256
 #define TILE_SIZE 32
+#define BIN_TILE_SIZE 64
 
 extern double size;
 //
@@ -47,15 +48,17 @@ __global__ void set_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int 
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   // int thread_id = threadIdx.x;
   // int block_id = blockIdx.x;
-  if(tid >= 1)
+  if(tid >= bin_row_size)
     return;
 
   // _shared_ bin_t tmp_bin_arr[64];
+  int start = tid * bin_row_size;
+  int end = (tid + 1) * bin_row_size;
 
   for (int iCount = 0; iCount < n; iCount++)
   {
     int binNum = particles[iCount].binNum;
-    if (binNum > 0 && binNum < bin_row_size * bin_row_size)
+    if (binNum >= start && binNum < bin_row_size * bin_row_size && binNum < end)
     {
       bin_arr[binNum].arr[bin_arr[binNum].size] = iCount;
       atomicAdd(&(bin_arr[binNum].size), 1);
