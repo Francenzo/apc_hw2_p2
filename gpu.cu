@@ -47,7 +47,7 @@ __global__ void set_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int 
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   // int thread_id = threadIdx.x;
   // int block_id = blockIdx.x;
-  if(tid >= bin_row_size)
+  if(tid >= 1)
     return;
 
   // _shared_ bin_t tmp_bin_arr[64];
@@ -55,7 +55,7 @@ __global__ void set_bin_gpu(particle_t * particles, bin_t * bin_arr, int n, int 
   for (int iCount = 0; iCount < n; iCount++)
   {
     int binNum = particles[iCount].binNum;
-    if (binNum > (tid - 1) * bin_row_size && binNum > tid * bin_row_size)
+    if (binNum > 0 && binNum < bin_row_size * bin_row_size)
     {
       bin_arr[binNum].arr[bin_arr[binNum].size] = iCount;
       atomicAdd(&(bin_arr[binNum].size), 1);
@@ -256,7 +256,7 @@ int main( int argc, char **argv )
     //
     // Put particles into bins
     //
-    // set_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, size, bin_row_size);
+    set_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, size, bin_row_size);
 
     //
     //  compute bins
