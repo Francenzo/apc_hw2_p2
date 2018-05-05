@@ -244,11 +244,11 @@ int main( int argc, char **argv )
   printf("Using bins...\r\n");
 #endif
 
+  int grid = (n + NUM_THREADS - 1) / NUM_THREADS;
 
   for( int step = 0; step < NSTEPS; step++ )
   {
-    int grid = (n + NUM_THREADS - 1) / NUM_THREADS;
-    // int grid_bins = (num_bins + NUM_THREADS - 1) / NUM_THREADS;
+    int grid_bins = (bin_row_size + NUM_THREADS - 1) / NUM_THREADS;
 
 #ifdef GPU_BINS
     //
