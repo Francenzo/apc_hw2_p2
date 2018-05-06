@@ -94,7 +94,7 @@ void init_particles( int n, particle_t *p )
 //  Initialize the particle positions and velocities
 // Make a structure of arrays for memory coalescence
 //
-void init_particles_array( int n, particle_arr_t &p )
+void init_particles_array( int n, particle_arr_t *p )
 {
     srand48( time( NULL ) );
         
@@ -117,14 +117,14 @@ void init_particles_array( int n, particle_arr_t &p )
         //
         //  distribute particles evenly to ensure proper spacing
         //
-        p.x[i] = size*(1.+(k%sx))/(1+sx);
-        p.y[i] = size*(1.+(k/sx))/(1+sy);
+        p->x[i] = size*(1.+(k%sx))/(1+sx);
+        p->y[i] = size*(1.+(k/sx))/(1+sy);
 
         //
         //  assign random velocities within a bound
         //
-        p.vx[i] = drand48()*2-1;
-        p.vy[i] = drand48()*2-1;
+        p->vx[i] = drand48()*2-1;
+        p->vy[i] = drand48()*2-1;
     }
     free( shuffle );
 }
@@ -194,6 +194,22 @@ void save( FILE *f, int n, particle_t *p )
     for( int i = 0; i < n; i++ )
         fprintf( f, "%g %g\n", p[i].x, p[i].y );
 }
+
+//
+//  I/O routines
+//
+void save_array( FILE *f, int n, particle_arr_t *p )
+{
+    static bool first = true;
+    if( first )
+    {
+        fprintf( f, "%d %g\n", n, size );
+        first = false;
+    }
+    for( int i = 0; i < n; i++ )
+        fprintf( f, "%g %g\n", p->x[i], p->y[i] );
+}
+
 
 //
 //  command line option processing
