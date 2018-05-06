@@ -38,6 +38,7 @@ typedef struct
 //
 typedef struct 
 {
+  int * binNum;
   double * x;
   double * y;
   double * vx;
@@ -76,6 +77,7 @@ void move( particle_t &p );
 //
 FILE *open_save( char *filename, int n );
 void save( FILE *f, int n, particle_t *p );
+void save_array( FILE *f, int n, particle_arr_t &p );
 
 //
 //  argument processing routines

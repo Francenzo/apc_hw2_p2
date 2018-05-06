@@ -196,6 +196,22 @@ void save( FILE *f, int n, particle_t *p )
 }
 
 //
+//  I/O routines
+//
+void save_array( FILE *f, int n, particle_arr_t &p )
+{
+    static bool first = true;
+    if( first )
+    {
+        fprintf( f, "%d %g\n", n, size );
+        first = false;
+    }
+    for( int i = 0; i < n; i++ )
+        fprintf( f, "%g %g\n", p.x[i], p.y[i] );
+}
+
+
+//
 //  command line option processing
 //
 int find_option( int argc, char **argv, const char *option )
