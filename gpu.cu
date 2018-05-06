@@ -80,8 +80,8 @@ __global__ void set_bin_gpu(particle_arr_t *particles, bin_t * bin_arr, int n, i
 
 __device__ void apply_force_gpu(particle_arr_t *particles, int p_index, int n_index)
 {
-  double dx = (particles->x)[n_index] - (particles->x)[p_index];
-  double dy = (particles->y)[n_index] - (particles->y)[p_index];
+  double dx = particles->x[n_index] - particles->x[p_index];
+  double dy = particles->y[n_index] - particles->y[p_index];
   double r2 = dx * dx + dy * dy;
   if( r2 > cutoff*cutoff )
       return;
@@ -93,8 +93,8 @@ __device__ void apply_force_gpu(particle_arr_t *particles, int p_index, int n_in
   //  very simple short-range repulsive force
   //
   double coef = ( 1 - cutoff / r ) / r2 / mass;
-  (particles->ax)[p_index] += coef * dx;
-  (particles->ay)[p_index] += coef * dy;
+  particles->ax[p_index] += coef * dx;
+  particles->ay[p_index] += coef * dy;
 
 }
 
@@ -142,17 +142,17 @@ __global__ void compute_forces_bin_gpu(particle_arr_t *particles, bin_t * bin_ar
   //   apply_force_gpu(particles[tid], particles[iCount]);
 }
 
-// __global__ void compute_forces_gpu(particle_t * particles, int n)
-// {
-//   // Get thread (particle) ID
-//   int tid = threadIdx.x + blockIdx.x * blockDim.x;
-//   if(tid >= n) return;
+__global__ void compute_forces_gpu(particle_arr_t * particles, int n)
+{
+  // Get thread (particle) ID
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if(tid >= n) return;
 
-//   particles[tid].ax = particles[tid].ay = 0;
-//   for(int j = 0 ; j < n ; j++)
-//     apply_force_gpu(particles[tid], particles[j]);
+  particles->ax[tid] = particles->ay[tid] = 0;
+  for(int j = 0 ; j < n ; j++)
+    apply_force_gpu(particles, tid, j);
 
-// }
+}
 
 __global__ void move_gpu (particle_arr_t *particles, int n, double size)
 {
@@ -181,7 +181,7 @@ __global__ void move_gpu (particle_arr_t *particles, int n, double size)
     }
     while( (particles->y)[tid] < 0 || (particles->y)[tid] > size )
     {
-        (particles->y)[tid]  = (particles->y)[tid] < 0 ? -((particles->y)[tid]) : 2*size-particles->y[tid];
+        (particles->y)[tid]  = (particles->y)[tid] < 0 ? -((particles->y)[tid]) : 2*size-(particles->y)[tid];
         (particles->vy)[tid] = -((particles->vy)[tid]);
     }
 
@@ -292,18 +292,23 @@ int main( int argc, char **argv )
 #ifdef GPU_BINS
     //
     // Put particles into bins
-    //
-    compute_bins_gpu <<< grid, NUM_THREADS >>> (d_particles, n, size, bin_row_size);
+    // //
+    // compute_bins_gpu <<< grid, NUM_THREADS >>> (d_particles, n, size, bin_row_size);
 
     //
     // Put particles into bins
     //
-    set_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, size, bin_row_size);
+    // set_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, size, bin_row_size);
 
     //
     //  compute bins
     //
-    compute_forces_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, bin_row_size);
+    // compute_forces_bin_gpu <<< grid, NUM_THREADS >>> (d_particles, d_bins, n, bin_row_size);
+
+    //
+    //  compute forces
+    //
+    compute_forces_gpu <<< grid, NUM_THREADS >>> (d_particles, n);
 #else
 
     //
@@ -362,8 +367,13 @@ int main( int argc, char **argv )
 
 #endif
 
-    // cudaMemcpy(particles, d_particles, struct_size, cudaMemcpyDeviceToHost);
-    // printf("particle[%i].x = %f\r\n", 100, particles->x[100]);
+    cudaMemcpy(particles, d_particles, struct_size, cudaMemcpyDeviceToHost);
+    printf("particle[%i].x = %f\r\n", 200, particles->x[200]);
+    printf("particle[%i].y = %f\r\n", 200, particles->y[200]);
+    printf("particle[%i].vx = %f\r\n", 200, particles->vx[200]);
+    printf("particle[%i].vy = %f\r\n", 200, particles->vy[200]);
+    printf("particle[%i].ax = %f\r\n", 200, particles->ax[200]);
+    printf("particle[%i].ay = %f\r\n", 200, particles->ay[200]);
         
     //
     //  save if necessary
