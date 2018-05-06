@@ -24,6 +24,17 @@ extern double size;
 //   bin_arr[tid].size = 0;
 // }
 
+__global__ void malloc_particles(particle_arr_t * particles, int n)
+{
+  cudaMalloc((void **) particles->binNum, n * sizeof(int));
+  cudaMalloc((void **) particles->x, n * sizeof(double));
+  cudaMalloc((void **) particles->y, n * sizeof(double));
+  cudaMalloc((void **) particles->vx, n * sizeof(double));
+  cudaMalloc((void **) particles->vy, n * sizeof(double));
+  cudaMalloc((void **) particles->ax, n * sizeof(double));
+  cudaMalloc((void **) particles->ay, n * sizeof(double));
+}
+
 __device__ void bin_num_gpu(particle_arr_t *particle, int p_index, int size, int bin_row_size)
 {
   double frac_x = (particle->x)[p_index]/size;
@@ -221,13 +232,7 @@ int main( int argc, char **argv )
   
   particle_arr_t * d_particles;
   cudaMalloc((void **) d_particles, sizeof(particle_arr_t));
-  cudaMalloc((void **) d_particles->binNum, n * sizeof(int));
-  cudaMalloc((void **) d_particles->x, n * sizeof(double));
-  cudaMalloc((void **) d_particles->y, n * sizeof(double));
-  cudaMalloc((void **) d_particles->vx, n * sizeof(double));
-  cudaMalloc((void **) d_particles->vy, n * sizeof(double));
-  cudaMalloc((void **) d_particles->ax, n * sizeof(double));
-  cudaMalloc((void **) d_particles->ay, n * sizeof(double));
+  malloc_particles <<< 1,1 >>> (d_particles, n);
 
   
 
@@ -248,12 +253,14 @@ int main( int argc, char **argv )
   double copy_time = read_timer( );
 
   // Copy the particles to the GPU
-  cudaMemcpy(d_particles->x, particles->x, struct_size, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_particles->y, particles->y, struct_size, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_particles->vx, particles->vx, struct_size, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_particles->vy, particles->vy, struct_size, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_particles->ax, particles->ax, struct_size, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_particles->ay, particles->ay, struct_size, cudaMemcpyHostToDevice);
+  // cudaMemcpy(d_particles->x, particles->x, struct_size, cudaMemcpyHostToDevice);
+  // cudaMemcpy(d_particles->y, particles->y, struct_size, cudaMemcpyHostToDevice);
+  // cudaMemcpy(d_particles->vx, particles->vx, struct_size, cudaMemcpyHostToDevice);
+  // cudaMemcpy(d_particles->vy, particles->vy, struct_size, cudaMemcpyHostToDevice);
+  // cudaMemcpy(d_particles->ax, particles->ax, struct_size, cudaMemcpyHostToDevice);
+  // cudaMemcpy(d_particles->ay, particles->ay, struct_size, cudaMemcpyHostToDevice);
+
+  cudaMemcpy(d_particles, particles, struct_size, cudaMemcpyHostToDevice);
 
 
 #define GPU_BINS
@@ -354,20 +361,17 @@ int main( int argc, char **argv )
     cudaMemset(d_bins, 0, num_bins*sizeof(bin_t));
 
 #endif
+
+    // cudaMemcpy(particles, d_particles, struct_size, cudaMemcpyDeviceToHost);
+    // printf("particle[%i].x = %f\r\n", 100, particles->x[100]);
         
     //
     //  save if necessary
     //
     if( fsave && (step%SAVEFREQ) == 0 ) {
       // Copy the particles back to the CPU
-      // cudaMemcpy(particles, d_particles, struct_size, cudaMemcpyDeviceToHost);
+      cudaMemcpy(particles, d_particles, struct_size, cudaMemcpyDeviceToHost);
 
-      cudaMemcpy(particles->x, d_particles->x, struct_size, cudaMemcpyDeviceToHost);
-      cudaMemcpy(particles->y, d_particles->y, struct_size, cudaMemcpyDeviceToHost);
-      cudaMemcpy(particles->vx, d_particles->vx, struct_size, cudaMemcpyDeviceToHost);
-      cudaMemcpy(particles->vy, d_particles->vy, struct_size, cudaMemcpyDeviceToHost);
-      cudaMemcpy(particles->ax, d_particles->ax, struct_size, cudaMemcpyDeviceToHost);
-      cudaMemcpy(particles->ay, d_particles->ay, struct_size, cudaMemcpyDeviceToHost);
       save_array( fsave, n, particles);
     }
   }
@@ -384,12 +388,7 @@ int main( int argc, char **argv )
   free( particles->vy );
   free( particles->ax );
   free( particles->ay );
-  cudaFree(d_particles->x);
-  cudaFree(d_particles->y);
-  cudaFree(d_particles->vx);
-  cudaFree(d_particles->vy);
-  cudaFree(d_particles->ax);
-  cudaFree(d_particles->ay);
+  cudaFree(d_particles);
   if( fsave )
       fclose( fsave );
   
