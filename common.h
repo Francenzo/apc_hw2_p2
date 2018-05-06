@@ -68,7 +68,7 @@ double read_timer( );
 void set_size( int n );
 int get_bin_row_size();
 void init_particles( int n, particle_t *p );
-void init_particles_array( int n, particle_arr_t *p );
+void init_particles_array( int n, particle_arr_t &p );
 void apply_force( particle_t &particle, particle_t &neighbor );
 void move( particle_t &p );
 
@@ -77,7 +77,7 @@ void move( particle_t &p );
 //
 FILE *open_save( char *filename, int n );
 void save( FILE *f, int n, particle_t *p );
-void save_array( FILE *f, int n, particle_arr_t *p );
+void save_array( FILE *f, int n, particle_arr_t &p );
 
 //
 //  argument processing routines
