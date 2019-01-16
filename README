@@ -12,3 +12,4 @@ Note that 'auto-bridges-gpu' tests your GPU code against 'serial.cu'. Without an
 You will need to modify either 'auto-bridges-gpu' or replace 'gpu.cu' and 'serial.cu' with their O(n) versions. You should already have a working O(n) serial code from Part 1 of this assignment.
 
 We will be testing your code against an optimized, O(n), 'serial.cu' code. If you would like this optimized code to test against your GPU code, then please ask your instructor.
+
